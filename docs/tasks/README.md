@@ -13,3 +13,4 @@
 | 2026-10-20 | [Backblaze B2 backups](2026-10-20-backblaze-backup.md) | done (not run against a real bucket) |
 | 2026-10-20 | [Public release preparation](2026-10-20-public-release-prep.md) | done in repo; GitHub settings and posts pending |
 | 2026-10-21 | [Update all button](2026-10-21-update-all-button.md) | done (not clicked live) |
+| 2026-10-21 | [Launch busy cursor](2026-10-21-launch-busy-cursor.md) | done (protocol-verified, not clicked live) |

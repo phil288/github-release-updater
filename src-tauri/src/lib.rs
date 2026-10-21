@@ -1,3 +1,4 @@
+mod activation;
 mod commands;
 mod state;
 
@@ -218,8 +219,17 @@ pub(crate) fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), Stri
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let minimized = std::env::args().any(|a| a == "--minimized");
+    // Before single-instance runs: if another instance is already up, this
+    // process exits during plugin setup and the token must already be saved.
+    activation::save_launch_token();
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_window(app, None)))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                activation::use_forwarded_token();
+                show_window(&handle, None);
+            });
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
