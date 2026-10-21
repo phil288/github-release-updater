@@ -80,6 +80,8 @@
   <div style="display: grid; gap: 8px; margin-top: 12px">
     <label class="check"><input type="checkbox" bind:checked={draft.autostart} /> Start at login (in the tray)</label>
     <label class="check"><input type="checkbox" bind:checked={draft.open_window_on_update} /> Open this window when updates are found</label>
+    <label class="check"><input type="checkbox" bind:checked={draft.auto_update} /> Install updates automatically
+      <span class="muted small">(you still approve the {store.platform?.os === "windows" ? "UAC" : "password"} prompt; apps can opt out)</span></label>
     <label class="check"><input type="checkbox" bind:checked={draft.require_checksum} /> Only install releases that publish a SHA-256 checksum</label>
   </div>
   <div class="row" style="margin-top: 12px"><button class="primary" onclick={save}>Save</button></div>

@@ -43,7 +43,8 @@ with the OS's own package tools, after you approve.
 - **Verified downloads.** SHA-256 from GitHub's asset `digest`, `<asset>.sha256` or `SHA256SUMS*`.
   HTTPS only, GitHub hosts only.
 - **You stay in control.** A desktop notification announces updates; nothing installs until you
-  click Install and approve the OS prompt.
+  click Install and approve the OS prompt. Or turn on *Install updates automatically* (off by
+  default, per-app opt-out) to start installs right after a check; the OS prompt still appears.
   - Ubuntu: `pkexec apt-get install ./file.deb`, polkit password dialog, live apt output.
   - Windows: `msiexec /i file.msi /passive` started elevated, UAC prompt, MSI progress window.
 - **Uninstall** tracked apps from the same window (`apt-get remove` / `msiexec /x`).

@@ -15,6 +15,7 @@ const app = (id: string, repo: string, name: string, installed: string, pkg: str
   windows_display_name: null,
   installed_version: installed,
   skipped_version: null,
+  auto_update: true,
 });
 
 const apps = [
@@ -30,6 +31,7 @@ const settings: Settings = {
   check_interval_hours: 6,
   autostart: true,
   open_window_on_update: true,
+  auto_update: false,
   msi_ui: "passive",
   require_checksum: false,
   apps_view: "cards",

@@ -40,6 +40,7 @@
       windows_display_name: nul(draft.windows_display_name),
       installed_version: nul(draft.installed_version),
       skipped_version: draft.skipped_version,
+      auto_update: draft.auto_update,
     };
   }
 
@@ -109,6 +110,8 @@
   <div class="row" style="margin-top: 12px; gap: 20px">
     <label class="check"><input type="checkbox" bind:checked={draft.enabled} /> Enabled</label>
     <label class="check"><input type="checkbox" bind:checked={draft.include_prerelease} /> Include pre-releases</label>
+    <label class="check" title={store.settings?.auto_update ? "" : "Automatic updates are off in Settings"}>
+      <input type="checkbox" bind:checked={draft.auto_update} /> Update automatically</label>
     {#if draft.skipped_version}
       <span class="small muted">Skipping {draft.skipped_version}
         <button type="button" class="link" onclick={() => (draft.skipped_version = null)}>undo</button></span>

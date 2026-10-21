@@ -47,6 +47,11 @@ pub struct AppState {
     pub last_check: Mutex<Option<u64>>,
     pub checking: AtomicBool,
     pub installing: Mutex<Option<Uuid>>,
+    /// An automatic install batch is running.
+    pub auto_installing: AtomicBool,
+    /// Release tags whose automatic install was cancelled or failed during
+    /// this run, per app. Not retried automatically; Install still works.
+    pub auto_declined: Mutex<HashMap<Uuid, String>>,
     /// Serialises installs: package managers do not like concurrent runs.
     pub install_lock: tokio::sync::Mutex<()>,
     /// Wakes the scheduler early (settings changed).

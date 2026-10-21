@@ -3,7 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { api, errorText } from "./lib/api";
   import { emptyProgress, store } from "./lib/store.svelte";
-  import type { Page, ProgressEvent, Status } from "./lib/types";
+  import type { FinishedEvent, Page, ProgressEvent, Status } from "./lib/types";
   import Updates from "./components/Updates.svelte";
   import Apps from "./components/Apps.svelte";
   import SettingsPage from "./components/Settings.svelte";
@@ -40,6 +40,13 @@
       listen<Page>("navigate", (e) => (store.page = e.payload)),
       listen<Status>("status-changed", (e) => (store.status = e.payload)),
       listen<ProgressEvent>("install-progress", (e) => onProgress(e.payload)),
+      listen<FinishedEvent>("install-finished", (e) => {
+        const p = (store.progress[e.payload.app_id] ??= emptyProgress());
+        p.stage = e.payload.stage;
+        p.message = e.payload.message;
+        // An automatic install may have changed the installed version.
+        api.getSettings().then((s) => (store.settings = s), () => {});
+      }),
     ];
     (async () => {
       try {

@@ -76,6 +76,9 @@ pub struct TrackedApp {
     /// A version the user chose to skip; newer versions are offered again.
     #[serde(default)]
     pub skipped_version: Option<String>,
+    /// Include this app in automatic installs when [`Settings::auto_update`] is on.
+    #[serde(default = "yes")]
+    pub auto_update: bool,
 }
 
 fn yes() -> bool {
@@ -95,6 +98,7 @@ impl TrackedApp {
             windows_display_name: None,
             installed_version: None,
             skipped_version: None,
+            auto_update: true,
         })
     }
 
@@ -129,6 +133,10 @@ pub struct Settings {
     /// Show the window on the Updates page when an update is found.
     #[serde(default = "yes")]
     pub open_window_on_update: bool,
+    /// Install updates as soon as a check finds them, without waiting for a
+    /// click. The OS elevation prompt (polkit / UAC) still appears.
+    #[serde(default)]
+    pub auto_update: bool,
     #[serde(default)]
     pub msi_ui: MsiUi,
     /// Refuse to install assets for which the release publishes no checksum.
@@ -154,6 +162,7 @@ impl Default for Settings {
             check_interval_hours: default_interval(),
             autostart: true,
             open_window_on_update: true,
+            auto_update: false,
             msi_ui: MsiUi::default(),
             require_checksum: false,
             apps_view: AppsView::default(),
@@ -263,6 +272,8 @@ mod tests {
         let s: Settings = serde_json::from_str(r#"{"apps":[{"repo":"a/b"}]}"#).unwrap();
         let s = s.validate().unwrap();
         assert!(s.apps[0].enabled);
+        assert!(s.apps[0].auto_update);
+        assert!(!s.auto_update);
         assert_eq!(s.check_interval_hours, 6);
     }
 

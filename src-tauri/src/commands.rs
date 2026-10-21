@@ -83,9 +83,29 @@ fn version_of_tag(tag: &str) -> String {
     version::parse_tag(tag).map(|v| v.to_string()).unwrap_or_else(|| tag.to_string())
 }
 
+/// Final result of an install, for the UI. Sent by every install, including
+/// automatic ones the UI did not start.
+#[derive(Clone, serde::Serialize)]
+struct FinishedEvent {
+    app_id: Uuid,
+    stage: &'static str,
+    message: String,
+}
+
 #[tauri::command]
 pub async fn install_update(app: AppHandle, app_id: Uuid) -> CmdResult<InstallReport> {
+    install_pending(&app, app_id, false).await
+}
+
+/// Installs the pending update of `app_id`. With `wait`, queues behind a
+/// running installation instead of failing (automatic installs).
+pub(crate) async fn install_pending(app: &AppHandle, app_id: Uuid, wait: bool) -> CmdResult<InstallReport> {
     let state = app.state::<AppState>();
+    let _guard = if wait {
+        state.install_lock.lock().await
+    } else {
+        state.install_lock.try_lock().map_err(|_| "Another installation is in progress.")?
+    };
     let update = state
         .pending
         .lock()
@@ -93,7 +113,6 @@ pub async fn install_update(app: AppHandle, app_id: Uuid) -> CmdResult<InstallRe
         .get(&app_id)
         .cloned()
         .ok_or("This update is no longer pending; run a new check.")?;
-    let _guard = state.install_lock.try_lock().map_err(|_| "Another installation is in progress.")?;
 
     // Re-check right before installing: a newer release may have been published
     // since the last check, and updates always go straight to the highest version.
@@ -125,7 +144,7 @@ pub async fn install_update(app: AppHandle, app_id: Uuid) -> CmdResult<InstallRe
             };
             state.pending.lock().unwrap().remove(&app_id);
             state.results.lock().unwrap().insert(app_id, other);
-            emit_status(&app);
+            emit_status(app);
             return Err(reason);
         }
     };
@@ -138,7 +157,7 @@ pub async fn install_update(app: AppHandle, app_id: Uuid) -> CmdResult<InstallRe
     }
 
     *state.installing.lock().unwrap() = Some(app_id);
-    emit_status(&app);
+    emit_status(app);
 
     let handle = app.clone();
     let last = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1)));
@@ -185,16 +204,29 @@ pub async fn install_update(app: AppHandle, app_id: Uuid) -> CmdResult<InstallRe
             state.pending.lock().unwrap().remove(&app_id);
             state.results.lock().unwrap().insert(app_id, CheckResult::UpToDate { tag: update.tag.clone() });
             let extra = if report.outcome == Outcome::InstalledRebootRequired { " A restart is required." } else { "" };
-            notify(&app, "Update installed", &format!("{} {} was installed.{extra}", update.app_name, update.tag));
+            notify(app, "Update installed", &format!("{} {} was installed.{extra}", update.app_name, update.tag));
         }
         Ok(report) => {
             if let Outcome::Failed { message, .. } = &report.outcome {
-                notify(&app, "Update failed", &format!("{} {}: {message}", update.app_name, update.tag));
+                notify(app, "Update failed", &format!("{} {}: {message}", update.app_name, update.tag));
             }
         }
-        Err(e) => notify(&app, "Update failed", &format!("{} {}: {e}", update.app_name, update.tag)),
+        Err(e) => notify(app, "Update failed", &format!("{} {}: {e}", update.app_name, update.tag)),
     }
-    emit_status(&app);
+    let (stage, message) = match &result {
+        Ok(r) => match &r.outcome {
+            Outcome::Installed => ("done", format!("{} {} installed.", update.app_name, r.tag)),
+            Outcome::InstalledRebootRequired => {
+                ("done", format!("{} {} installed — restart required.", update.app_name, r.tag))
+            }
+            Outcome::Cancelled => ("cancelled", "Installation cancelled.".to_string()),
+            Outcome::Failed { message, .. } => ("failed", message.clone()),
+            Outcome::Uninstalled | Outcome::UninstalledRebootRequired => ("failed", "Unexpected outcome.".to_string()),
+        },
+        Err(e) => ("failed", e.to_string()),
+    };
+    let _ = app.emit("install-finished", FinishedEvent { app_id, stage, message });
+    emit_status(app);
     result.map_err(err)
 }
 

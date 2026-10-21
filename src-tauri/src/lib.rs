@@ -16,6 +16,8 @@ use updater_core::check::{self, CheckResult};
 use updater_core::config::Settings;
 use updater_core::b2::B2;
 use updater_core::github::Client;
+use updater_core::installer::Outcome;
+use uuid::Uuid;
 
 const STARTUP_DELAY: Duration = Duration::from_secs(20);
 const AUTO_BACKUP_DELAY: Duration = Duration::from_secs(10);
@@ -77,10 +79,22 @@ pub(crate) async fn run_check(app: &AppHandle) {
         results.insert(tracked.id, result);
     }
 
+    let auto: Vec<Uuid> = if settings.auto_update {
+        let declined = state.auto_declined.lock().unwrap();
+        available
+            .values()
+            .filter(|u| settings.app(u.app_id).is_some_and(|a| a.auto_update))
+            .filter(|u| declined.get(&u.app_id) != Some(&u.tag))
+            .map(|u| u.app_id)
+            .collect()
+    } else {
+        Vec::new()
+    };
     let newly_found: Vec<String> = {
         let mut pending = state.pending.lock().unwrap();
         let fresh = available
             .values()
+            .filter(|u| !auto.contains(&u.app_id))
             .filter(|u| pending.get(&u.app_id).is_none_or(|p| p.tag != u.tag))
             .map(|u| format!("{} {}", u.app_name, u.tag))
             .collect();
@@ -92,6 +106,12 @@ pub(crate) async fn run_check(app: &AppHandle) {
     state.checking.store(false, Ordering::SeqCst);
     emit_status(app);
 
+    if !auto.is_empty() {
+        // Spawned: `check_now` returns to the UI without waiting for installs.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { auto_install(&app, auto).await });
+    }
+
     if !newly_found.is_empty() {
         let title = if newly_found.len() == 1 { "Update available" } else { "Updates available" };
         notify(app, title, &format!("{}\nOpen GitHub Release Updater to install.", newly_found.join(", ")));
@@ -99,6 +119,35 @@ pub(crate) async fn run_check(app: &AppHandle) {
             show_window(app, Some("updates"));
         }
     }
+}
+
+/// Installs the given pending updates one after another, queuing behind any
+/// manual install. A cancelled or failed install is remembered by tag and not
+/// retried automatically, so a dismissed password / UAC prompt does not come
+/// back at every check.
+async fn auto_install(app: &AppHandle, ids: Vec<Uuid>) {
+    let state = app.state::<AppState>();
+    if state.auto_installing.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    for id in ids {
+        let Some(tag) = state.pending.lock().unwrap().get(&id).map(|u| u.tag.clone()) else { continue };
+        let declined = match commands::install_pending(app, id, true).await {
+            Ok(report) => !matches!(report.outcome, Outcome::Installed | Outcome::InstalledRebootRequired),
+            // Installed or skipped meanwhile: nothing to remember.
+            Err(_) if !state.pending.lock().unwrap().contains_key(&id) => false,
+            Err(e) => {
+                eprintln!("automatic install of {tag} failed: {e}");
+                true
+            }
+        };
+        if declined {
+            // Remember the tag actually attempted, which may be newer than `tag`.
+            let tag = state.pending.lock().unwrap().get(&id).map_or(tag, |u| u.tag.clone());
+            state.auto_declined.lock().unwrap().insert(id, tag);
+        }
+    }
+    state.auto_installing.store(false, Ordering::SeqCst);
 }
 
 fn now_unix() -> u64 {
@@ -255,6 +304,8 @@ pub fn run() {
                 last_check: Default::default(),
                 checking: Default::default(),
                 installing: Default::default(),
+                auto_installing: Default::default(),
+                auto_declined: Default::default(),
                 install_lock: Default::default(),
                 wake: Default::default(),
                 settings_saved: Default::default(),

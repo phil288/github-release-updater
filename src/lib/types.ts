@@ -18,6 +18,8 @@ export interface TrackedApp {
   windows_display_name: string | null;
   installed_version: string | null;
   skipped_version: string | null;
+  /** Included in automatic installs when `Settings.auto_update` is on. */
+  auto_update: boolean;
 }
 
 export type MsiUi = "passive" | "full";
@@ -29,6 +31,7 @@ export interface Settings {
   check_interval_hours: number;
   autostart: boolean;
   open_window_on_update: boolean;
+  auto_update: boolean;
   msi_ui: MsiUi;
   require_checksum: boolean;
   apps_view: AppsView;
@@ -106,6 +109,13 @@ export type Progress =
   | { stage: "log"; line: string };
 
 export type ProgressEvent = Progress & { app_id: string };
+
+/** Sent when any install ends, including automatic ones. */
+export interface FinishedEvent {
+  app_id: string;
+  stage: "done" | "cancelled" | "failed";
+  message: string;
+}
 
 export type Outcome =
   | { kind: "installed" }
