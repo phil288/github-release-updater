@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/phil288/github-release-updater/discussions
+    about: Ask a question or share an idea in Discussions.
+  - name: Security vulnerability
+    url: https://github.com/phil288/github-release-updater/security/advisories/new
+    about: Report security issues privately, never in a public issue.

@@ -1,0 +1,27 @@
+name: Release asset not detected
+description: A repository publishes a .deb or .msi, but the app picks the wrong file or none.
+labels: ["asset-selection"]
+body:
+  - type: input
+    id: repo
+    attributes:
+      label: Repository
+      placeholder: owner/name
+    validations:
+      required: true
+  - type: input
+    id: tag
+    attributes:
+      label: Release tag
+      placeholder: v1.2.3
+  - type: input
+    id: expected
+    attributes:
+      label: Asset you expected
+      placeholder: app_1.2.3_amd64.deb
+  - type: textarea
+    id: probe
+    attributes:
+      label: Probe output
+      description: "If you build from source: `cargo run -p updater-core --example probe -- owner/name`"
+      render: text

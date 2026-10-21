@@ -1,0 +1,161 @@
+name: release
+
+# Builds the .deb (Ubuntu) and .msi (Windows) on GitHub-hosted runners and publishes
+# them as a GitHub release when a version tag is pushed:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The .deb is built on Ubuntu 22.04 so it links against an older glibc and installs on
+# Ubuntu 22.04, 24.04 and later. The tag must match the version in package.json, Cargo.toml and src-tauri/tauri.conf.json.
+# Tags with a suffix (v0.2.0-rc.1) become pre-releases. Running the workflow manually
+# (workflow_dispatch) builds the packages as artifacts without publishing a release.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  APP_SLUG: gh-release-updater
+
+jobs:
+  prepare:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        name: Read and verify version
+        shell: bash
+        run: |
+          version=$(node -p 'require("./src-tauri/tauri.conf.json").version')
+          pkg=$(node -p 'require("./package.json").version')
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          echo "tauri.conf.json=$version package.json=$pkg Cargo.toml=$cargo"
+          if [[ "$version" != "$pkg" || "$version" != "$cargo" ]]; then
+            echo "::error::Version mismatch between tauri.conf.json, package.json and Cargo.toml"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match project version v$version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true"; else echo "prerelease=false"; fi >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Build .deb
+    needs: prepare
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: cargo test --workspace --locked
+      - name: Build
+        run: npx tauri build --bundles deb
+      - name: Collect package
+        shell: bash
+        run: |
+          mkdir -p out
+          deb=$(ls target/release/bundle/deb/*.deb | head -n1)
+          arch=$(dpkg-deb -f "$deb" Architecture)
+          cp "$deb" "out/${APP_SLUG}_${{ needs.prepare.outputs.version }}_${arch}.deb"
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: out/*.deb
+          if-no-files-found: error
+
+  windows:
+    name: Build .msi
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npx tauri build --bundles msi
+      - name: Collect package
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $msi = Get-ChildItem target\release\bundle\msi\*.msi | Select-Object -First 1
+          if (-not $msi) { Write-Output "::error::no .msi produced"; exit 1 }
+          Copy-Item $msi.FullName "out\$($env:APP_SLUG)_${{ needs.prepare.outputs.version }}_x64.msi"
+          Get-ChildItem out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi
+          path: out/*.msi
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: github.ref_type == 'tag'
+    needs: [prepare, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum *.deb *.msi > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: GitHub Release Updater ${{ github.ref_name }}
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            | OS | Download | Install |
+            |---|---|---|
+            | Ubuntu 22.04+ / Debian (x64) | `gh-release-updater_${{ needs.prepare.outputs.version }}_amd64.deb` | `sudo apt install ./gh-release-updater_${{ needs.prepare.outputs.version }}_amd64.deb` |
+            | Windows 10/11 (x64) | `gh-release-updater_${{ needs.prepare.outputs.version }}_x64.msi` | Double-click. The installer is unsigned, so SmartScreen asks once: *More info → Run anyway*. |
+
+            Verify a download: `sha256sum -c SHA256SUMS.txt --ignore-missing`
+
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.deb
+            dist/*.msi
+            dist/SHA256SUMS.txt

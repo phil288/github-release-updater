@@ -1,0 +1,43 @@
+name: Bug report
+description: Something does not work as expected.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Tracked repository
+      description: The GitHub repository involved, if any (e.g. `owner/name`).
+  - type: input
+    id: version
+    attributes:
+      label: GitHub Release Updater version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Ubuntu 24.04
+        - Ubuntu 22.04
+        - Other Debian-based Linux
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >-
+        Install output from the Updates page, or the MSI log from
+        `%LOCALAPPDATA%\dev.phil.gh-release-updater\logs`. Remove anything private.
+      render: text

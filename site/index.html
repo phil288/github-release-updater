@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GitHub Release Updater – auto-update apps installed from GitHub releases (Ubuntu .deb, Windows .msi)</title>
+<meta name="description" content="Free, open-source tray app that watches GitHub repositories and installs new .deb (Ubuntu) and .msi (Windows) release packages after your approval. SHA-256 verified, polkit/UAC prompt, no background installs." />
+<meta name="keywords" content="github release updater, auto update github releases, update deb from github, update msi from github, obtainium for desktop, github release notifier, ubuntu app updater, windows app updater" />
+<link rel="canonical" href="https://phil288.github.io/github-release-updater/" />
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+<meta name="theme-color" content="#2f6fde" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GitHub Release Updater" />
+<meta property="og:title" content="GitHub Release Updater – keep apps from GitHub releases up to date" />
+<meta property="og:description" content="Tray app for Ubuntu and Windows that installs new .deb and .msi releases from GitHub, verified and with your approval." />
+<meta property="og:url" content="https://phil288.github.io/github-release-updater/" />
+<meta property="og:image" content="https://phil288.github.io/github-release-updater/assets/social-preview.png" />
+<meta property="og:image:width" content="1280" />
+<meta property="og:image:height" content="640" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="GitHub Release Updater" />
+<meta name="twitter:description" content="Auto-update the apps you installed from GitHub releases on Ubuntu and Windows." />
+<meta name="twitter:image" content="https://phil288.github.io/github-release-updater/assets/social-preview.png" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "GitHub Release Updater",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Ubuntu 22.04+, Debian, Windows 10, Windows 11",
+  "description": "Tray application that watches GitHub repositories and installs new .deb (Ubuntu) and .msi (Windows) release packages after your approval, with SHA-256 verification.",
+  "url": "https://phil288.github.io/github-release-updater/",
+  "downloadUrl": "https://github.com/phil288/github-release-updater/releases/latest",
+  "codeRepository": "https://github.com/phil288/github-release-updater",
+  "license": "https://opensource.org/licenses/MIT",
+  "image": "https://phil288.github.io/github-release-updater/assets/social-preview.png",
+  "screenshot": "https://phil288.github.io/github-release-updater/assets/screenshots/updates.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "How do I automatically update a .deb installed from GitHub releases?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Add the repository (owner/name) to GitHub Release Updater. It checks for new releases every few hours, picks the .deb for your CPU, verifies its SHA-256 checksum and installs it with apt after you approve and enter your password." } },
+    { "@type": "Question", "name": "Does it install updates without asking?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Every install needs your click in the window and the operating system's own elevation prompt (polkit on Ubuntu, UAC on Windows)." } },
+    { "@type": "Question", "name": "Do I need a GitHub account or token?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Without a token GitHub allows 60 API requests per hour, which covers dozens of tracked apps. An optional fine-grained token with no permissions raises the limit to 5,000." } },
+    { "@type": "Question", "name": "Is it like Obtainium for desktop?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes, it fills the same role for Ubuntu and Windows: it tracks apps that are distributed through GitHub releases instead of an app store or apt repository, and keeps them up to date." } }
+  ]
+}
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --bg-alt: #f4f6fa; --text: #14181f; --muted: #5a6475; --accent: #2f6fde;
+    --accent-text: #ffffff; --border: #e2e6ee; --code-bg: #eef1f6; --hero-from: #0f1f3d; --hero-to: #2f6fde;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f131a; --bg-alt: #161b24; --text: #e7ebf2; --muted: #9aa5b8; --accent: #5b8ff0;
+      --border: #263040; --code-bg: #1c2330;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.6 "Inter", "Segoe UI", "Noto Sans", system-ui, -apple-system, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  header.hero { background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); color: #fff; padding: 56px 0 64px; }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+  .hero img.logo { width: 64px; height: 64px; }
+  .hero h1 { font-size: clamp(32px, 5vw, 50px); line-height: 1.1; margin: 16px 0; letter-spacing: -1px; }
+  .hero p.lead { font-size: 20px; color: #d6e2ff; margin: 0 0 28px; }
+  .shot { border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.4); background: #fff; }
+  .shot img { width: 100%; height: auto; display: block; }
+  .hero code { background: rgba(255,255,255,.16); color: #fff; }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 20px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+  .btn.primary { background: #fff; color: #1b3f8a; }
+  .btn.ghost { border: 1px solid rgba(255,255,255,.5); color: #fff; }
+  section { padding: 56px 0; }
+  section.alt { background: var(--bg-alt); }
+  h2 { font-size: 30px; margin: 0 0 24px; letter-spacing: -.5px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  section.alt .card { background: var(--bg); }
+  .card h3 { margin: 0 0 8px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  ol.steps { padding-left: 20px; } ol.steps li { margin-bottom: 8px; }
+  code, pre { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 14px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  code { background: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .gallery figure { margin: 0; } .gallery figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  .gallery .shot { box-shadow: 0 8px 24px rgba(0,0,0,.12); border: 1px solid var(--border); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .table-wrap { overflow-x: auto; }
+  details { border-bottom: 1px solid var(--border); padding: 12px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { padding: 32px 0; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  @media (max-width: 800px) {
+    .hero .wrap, .two, .gallery { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <img class="logo" src="assets/icon.svg" alt="GitHub Release Updater logo" width="64" height="64" />
+      <h1>Keep apps from GitHub releases up to date</h1>
+      <p class="lead">A small tray app for <strong>Ubuntu</strong> and <strong>Windows</strong>. It notices new releases of the apps you installed from GitHub, then downloads, verifies and installs the <code>.deb</code> or <code>.msi</code> when you click Install.</p>
+      <div class="btns">
+        <a class="btn primary" href="https://github.com/phil288/github-release-updater/releases/latest">Download</a>
+        <a class="btn ghost" href="https://github.com/phil288/github-release-updater">View on GitHub</a>
+      </div>
+    </div>
+    <div class="shot"><img src="assets/screenshots/updates.png" alt="Updates page listing draw.io and LocalSend updates with Install buttons" width="1800" height="1360" /></div>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <h2>Why</h2>
+    <p>Many great desktop apps ship only as a <code>.deb</code> or <code>.msi</code> on their GitHub releases page. No apt repository, no Microsoft Store, no auto-updater. You install them once and quietly fall behind. GitHub Release Updater watches those repositories and brings you the new version, like <em>Obtainium</em> does on Android.</p>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Features</h2>
+    <div class="grid">
+      <div class="card"><h3>Watches any public repo</h3><p>Paste <code>owner/name</code> or a release URL. Checks every 6 hours (configurable) or on demand.</p></div>
+      <div class="card"><h3>Picks the right file</h3><p>Matches your OS and CPU (x64, arm64, x86) and skips CLI, portable and other-architecture assets. Override with a regex per app.</p></div>
+      <div class="card"><h3>Straight to latest</h3><p>Jumps directly to the newest release and re-checks right before installing.</p></div>
+      <div class="card"><h3>Verified downloads</h3><p>SHA-256 from GitHub's asset digest, <code>.sha256</code> files or <code>SHA256SUMS</code>. HTTPS only, GitHub hosts only.</p></div>
+      <div class="card"><h3>You stay in control</h3><p>Nothing installs in the background. You click Install, then approve the polkit (Ubuntu) or UAC (Windows) prompt.</p></div>
+      <div class="card"><h3>Native installers</h3><p><code>apt-get install ./app.deb</code> resolves dependencies; <code>msiexec</code> shows MSI progress. Uninstall from the same window.</p></div>
+      <div class="card"><h3>Backup &amp; restore</h3><p>Export settings to JSON or back up automatically to Backblaze B2. Secrets never go into backups.</p></div>
+      <div class="card"><h3>Tiny and quiet</h3><p>Built with Rust and Tauri. Starts at login in the tray and stays out of your way.</p></div>
+      <div class="card"><h3>Free and open source</h3><p>MIT licensed. No telemetry, no account needed.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <div class="gallery">
+      <figure><div class="shot"><img src="assets/screenshots/apps.png" alt="Applications page with tracked apps shown as cards" loading="lazy" width="1800" height="1360" /></div><figcaption>Tracked applications</figcaption></figure>
+      <figure><div class="shot"><img src="assets/screenshots/settings.png" alt="Settings page with check interval, GitHub token and backup options" loading="lazy" width="1800" height="1360" /></div><figcaption>Settings, token and backups</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Ubuntu 22.04+ / Debian</h3>
+        <ol class="steps">
+          <li>Download <code>gh-release-updater_&lt;version&gt;_amd64.deb</code> from the <a href="https://github.com/phil288/github-release-updater/releases/latest">latest release</a>.</li>
+          <li>Install it:</li>
+        </ol>
+        <pre><code>sudo apt install ./gh-release-updater_*_amd64.deb</code></pre>
+      </div>
+      <div class="card">
+        <h3>Windows 10 / 11</h3>
+        <ol class="steps">
+          <li>Download <code>gh-release-updater_&lt;version&gt;_x64.msi</code> from the <a href="https://github.com/phil288/github-release-updater/releases/latest">latest release</a>.</li>
+          <li>Double-click it. The installer is not code-signed yet, so SmartScreen asks once: <em>More info → Run anyway</em>.</li>
+        </ol>
+      </div>
+    </div>
+    <p>Then add a repository on the <strong>Applications</strong> page. The app can track its own repository to update itself.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it compares</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>GitHub Release Updater</th><th>Obtainium</th><th>eget / ubi / similar CLIs</th><th>Watching releases on GitHub</th></tr></thead>
+      <tbody>
+        <tr><td>Platforms</td><td>Ubuntu, Windows</td><td>Android</td><td>Linux, macOS, Windows</td><td>Any</td></tr>
+        <tr><td>Installs system packages (.deb / .msi)</td><td>Yes, via apt / msiexec</td><td>APKs</td><td>No, extracts binaries</td><td>No</td></tr>
+        <tr><td>Checks automatically</td><td>Yes, from the tray</td><td>Yes</td><td>When you run them</td><td>Notifications only</td></tr>
+        <tr><td>GUI</td><td>Yes</td><td>Yes</td><td>No</td><td>Web</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <details><summary>How do I automatically update a .deb installed from GitHub?</summary><p>Add the repository on the Applications page. The app checks for new releases, picks the <code>.deb</code> for your CPU, verifies its checksum and installs it with apt after you approve.</p></details>
+    <details><summary>Does it install updates without asking?</summary><p>No. Every install needs your click and the OS elevation prompt (polkit on Ubuntu, UAC on Windows).</p></details>
+    <details><summary>Do I need a GitHub token?</summary><p>No. Without one GitHub allows 60 API requests per hour, enough for dozens of apps. An optional fine-grained token with no permissions raises that to 5,000. It is stored only on your machine.</p></details>
+    <details><summary>What if the app picks the wrong asset?</summary><p>Set a per-app regex pattern for Linux and Windows on the Applications page, or <a href="https://github.com/phil288/github-release-updater/issues/new?template=asset_not_detected.yml">report it</a> so the default rules improve.</p></details>
+    <details><summary>Fedora, Arch, macOS, AppImage?</summary><p>Not yet. Ubuntu/Debian (<code>.deb</code>) and Windows (<code>.msi</code>) are supported today. Upvote or open an issue for the platform you need.</p></details>
+    <details><summary>Is it safe?</summary><p>It installs what the repository owner publishes, so only track projects you trust. Downloads are HTTPS-only from GitHub hosts and checksum-verified when a checksum is published. See the <a href="https://github.com/phil288/github-release-updater/blob/main/SECURITY.md">security policy</a>.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    GitHub Release Updater is free software under the <a href="https://github.com/phil288/github-release-updater/blob/main/LICENSE">MIT License</a>.
+    Not affiliated with or endorsed by GitHub, Inc.
+    · <a href="https://github.com/phil288/github-release-updater">Source</a>
+    · <a href="https://github.com/phil288/github-release-updater/issues">Issues</a>
+    · <a href="https://github.com/phil288/github-release-updater/releases">Releases</a>
+  </div>
+</footer>
+</body>
+</html>

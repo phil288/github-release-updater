@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Source of assets/social-preview.png (1280x640, GitHub "Social preview" image).
+     Render: scripts/screenshots/capture.sh -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    font-family: "Inter", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+    background: linear-gradient(135deg, #0f1f3d 0%, #1b3f8a 60%, #2f6fde 100%);
+    color: #fff; display: flex; align-items: center; gap: 48px; padding: 0 64px; box-sizing: border-box;
+  }
+  .text { flex: 0 0 580px; }
+  .logo { width: 96px; height: 96px; margin-bottom: 28px; }
+  h1 { font-size: 60px; line-height: 1.05; margin: 0 0 20px; letter-spacing: -1.5px; }
+  p { font-size: 27px; line-height: 1.35; margin: 0 0 28px; color: #d6e2ff; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip { font-size: 18px; padding: 6px 14px; border-radius: 999px; background: rgba(255,255,255,.14); }
+  .shot { flex: 1; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.45); background: #fff; }
+  .shot img { width: 100%; display: block; }
+</style>
+</head>
+<body>
+  <div class="text">
+    <img class="logo" src="../../assets/icon.svg" alt="" />
+    <h1>GitHub Release Updater</h1>
+    <p>Auto-update the apps you installed from GitHub releases. One click, verified, with your OS's own admin prompt.</p>
+    <div class="chips"><span class="chip">Ubuntu .deb</span><span class="chip">Windows .msi</span><span class="chip">SHA-256</span><span class="chip">Open source</span></div>
+  </div>
+  <div class="shot"><img src="../../assets/screenshots/updates.png" alt="" /></div>
+</body>
+</html>

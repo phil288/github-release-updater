@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/updater-core", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Philippe S"]
+repository = "https://github.com/phil288/github-release-updater"
+homepage = "https://phil288.github.io/github-release-updater/"
+keywords = ["github", "updater", "auto-update", "deb", "msi"]
+categories = ["command-line-utilities", "development-tools"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
