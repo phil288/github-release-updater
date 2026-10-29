@@ -23,7 +23,12 @@ pub struct UpdateInfo {
     pub published_at: Option<String>,
     pub notes: Option<String>,
     pub prerelease: bool,
-    pub asset: Asset,
+    /// Release asset to install; `None` when installed by [`Self::install_script`].
+    #[serde(default)]
+    pub asset: Option<Asset>,
+    /// URL of the install script run instead of installing an asset.
+    #[serde(default)]
+    pub install_script: Option<String>,
     /// Every asset of the release; needed to locate checksum files.
     pub release_assets: Vec<Asset>,
     /// Releases between the installed version and `tag` that are jumped over
@@ -51,6 +56,8 @@ pub struct Preview {
     pub selected: Option<String>,
     pub installer_assets: Vec<String>,
     pub checksum: Option<String>,
+    /// Install script used instead of an asset on this OS.
+    pub install_script: Option<String>,
 }
 
 pub async fn preview(
@@ -81,6 +88,7 @@ pub async fn preview(
             .map(|a| a.name.clone())
             .collect(),
         checksum,
+        install_script: app.install_script(platform.os).map(str::to_string),
     }))
 }
 
@@ -135,11 +143,19 @@ fn evaluate(
         .into_iter()
         .map(|r| r.tag_name.clone())
         .collect();
-    let Some(asset) = assets::select(&release.assets, platform, pattern).cloned() else {
+    let install_script = app.install_script(platform.os).map(str::to_string);
+    let asset = assets::select(&release.assets, platform, pattern).cloned();
+    if asset.is_none() && install_script.is_none() {
         return CheckResult::NoMatchingAsset {
             tag,
             assets: release.assets.iter().map(|a| a.name.clone()).collect(),
         };
+    }
+    // The script decides what to install; no asset is downloaded.
+    let asset = if install_script.is_some() {
+        None
+    } else {
+        asset
     };
     CheckResult::Available(Box::new(UpdateInfo {
         app_id: app.id,
@@ -153,6 +169,7 @@ fn evaluate(
         notes: release.body.map(|b| b.chars().take(4000).collect()),
         prerelease: release.prerelease,
         asset,
+        install_script,
         release_assets: release.assets,
         intermediate_tags,
     }))
@@ -180,7 +197,7 @@ pub struct InstallReport {
     pub package_name: Option<String>,
 }
 
-/// Download → verify → install.
+/// Download → verify → install, or download → run for an install script.
 pub async fn download_and_install(
     client: &Client,
     update: &UpdateInfo,
@@ -190,38 +207,43 @@ pub async fn download_and_install(
     progress: impl Fn(Progress) + Send + Sync + Clone + 'static,
 ) -> Result<InstallReport> {
     let repo_dir = update.repo.replace('/', "_");
-    let dest = cache_dir
+    let dir = cache_dir
         .join(download::sanitize_file_name(&repo_dir))
-        .join(download::sanitize_file_name(&update.tag))
-        .join(download::sanitize_file_name(&update.asset.name));
+        .join(download::sanitize_file_name(&update.tag));
+    let asset = match (&update.asset, &update.install_script) {
+        (_, Some(url)) => return run_install_script(url, &dir, update, progress).await,
+        (Some(asset), None) => asset,
+        (None, None) => {
+            return Err(Error::Installer(format!(
+                "{} has no installable asset",
+                update.tag
+            )))
+        }
+    };
+    let dest = dir.join(download::sanitize_file_name(&asset.name));
 
     // Expected checksum is resolved before the download so a missing one fails fast.
-    let expected = match checksum::find_source(&update.asset, &update.release_assets) {
+    let expected = match checksum::find_source(asset, &update.release_assets) {
         Some(Source::Digest(h)) => Some(h),
         Some(Source::File(f)) => {
             let text = client.fetch_text(&f.browser_download_url).await?;
-            checksum::expected_from_file(&text, &update.asset.name)
+            checksum::expected_from_file(&text, &asset.name)
         }
         None => None,
     };
     if expected.is_none() && settings.require_checksum {
-        return Err(Error::ChecksumMissing(update.asset.name.clone()));
+        return Err(Error::ChecksumMissing(asset.name.clone()));
     }
 
     let http = download::download_client()?;
     {
         let p = progress.clone();
-        download::download(
-            &http,
-            &update.asset.browser_download_url,
-            &dest,
-            move |d, t| {
-                p(Progress::Downloading {
-                    downloaded: d,
-                    total: t,
-                })
-            },
-        )
+        download::download(&http, &asset.browser_download_url, &dest, move |d, t| {
+            p(Progress::Downloading {
+                downloaded: d,
+                total: t,
+            })
+        })
         .await?;
     }
 
@@ -231,7 +253,7 @@ pub async fn download_and_install(
         Some(exp) if *exp != actual => {
             let _ = tokio::fs::remove_file(&dest).await;
             return Err(Error::ChecksumMismatch {
-                file: update.asset.name.clone(),
+                file: asset.name.clone(),
                 expected: exp.clone(),
                 actual,
             });
@@ -271,6 +293,42 @@ pub async fn download_and_install(
     })
 }
 
+/// Fetches the install script and runs it. There is no published checksum to
+/// verify against; the SHA-256 is logged so the run can be audited.
+async fn run_install_script(
+    url: &str,
+    dir: &Path,
+    update: &UpdateInfo,
+    progress: impl Fn(Progress) + Send + Sync + Clone + 'static,
+) -> Result<InstallReport> {
+    // Settings saved before normalisation existed may still hold a pasted command.
+    let url = crate::script::normalize(url)?
+        .ok_or_else(|| Error::Installer("the install script URL is empty".into()))?;
+    let url = url.as_str();
+    let dest = dir.join(crate::script::file_name(Platform::current().os));
+    progress(Progress::Downloading {
+        downloaded: 0,
+        total: None,
+    });
+    progress(Progress::Log {
+        line: format!("Fetching install script {url}"),
+    });
+    let sha = crate::script::fetch(url, &dest).await?;
+    progress(Progress::Log {
+        line: format!("Install script SHA-256: {sha}"),
+    });
+    progress(Progress::Installing);
+    let p = progress.clone();
+    let outcome = installer::run_script(&dest, move |line| p(Progress::Log { line })).await?;
+    Ok(InstallReport {
+        outcome,
+        tag: update.tag.clone(),
+        file: dest,
+        verified: false,
+        package_name: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,7 +357,7 @@ mod tests {
         app.installed_version = Some("0.7.0".into());
         match evaluate(&app, &[release("v0.8.0")], p, None) {
             CheckResult::Available(u) => {
-                assert_eq!(u.asset.name, "wordcraft-0.8.0-linux-x86_64.deb")
+                assert_eq!(u.asset.unwrap().name, "wordcraft-0.8.0-linux-x86_64.deb")
             }
             other => panic!("{other:?}"),
         }
@@ -383,5 +441,32 @@ mod tests {
             evaluate(&app, &[], p, None),
             CheckResult::NoRelease
         ));
+    }
+
+    #[test]
+    fn install_script_replaces_asset() {
+        let mut app = TrackedApp::new("zed-industries/zed").unwrap();
+        app.install_script.linux = Some("https://zed.dev/install.sh".into());
+        app.installed_version = Some("0.7.0".into());
+        // No asset matches this CPU, yet the script makes the update installable.
+        let x86 = Platform {
+            os: Os::Linux,
+            arch: Arch::X86,
+        };
+        let u = available(evaluate(&app, &[release("v0.8.0")], x86, None));
+        assert_eq!(
+            u.install_script.as_deref(),
+            Some("https://zed.dev/install.sh")
+        );
+        assert!(u.asset.is_none());
+        // A script set only for Linux does not apply on Windows.
+        let win = Platform {
+            os: Os::Windows,
+            arch: Arch::X64,
+        };
+        let r = evaluate(&app, &[release("v0.8.0")], win, None);
+        if let CheckResult::Available(u) = r {
+            assert!(u.install_script.is_none());
+        }
     }
 }

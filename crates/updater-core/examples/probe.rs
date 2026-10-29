@@ -34,27 +34,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !args.iter().any(|a| a == "--download") {
         return Ok(());
     }
+    let Some(asset) = &u.asset else {
+        return Ok(());
+    };
     let dir = tempfile::tempdir()?;
-    let dest = dir.path().join(download::sanitize_file_name(&u.asset.name));
+    let dest = dir.path().join(download::sanitize_file_name(&asset.name));
     download::download(
         &download::download_client()?,
-        &u.asset.browser_download_url,
+        &asset.browser_download_url,
         &dest,
         |_, _| {},
     )
     .await?;
     let actual = checksum::sha256_file(&dest).await?;
-    let expected = match checksum::find_source(&u.asset, &u.release_assets) {
+    let expected = match checksum::find_source(asset, &u.release_assets) {
         Some(Source::Digest(h)) => Some(h),
         Some(Source::File(f)) => checksum::expected_from_file(
             &client.fetch_text(&f.browser_download_url).await?,
-            &u.asset.name,
+            &asset.name,
         ),
         None => None,
     };
     println!(
         "downloaded {} ({} bytes)",
-        u.asset.name,
+        asset.name,
         std::fs::metadata(&dest)?.len()
     );
     println!(

@@ -15,3 +15,4 @@
 | 2026-10-21 | [Update all button](2026-10-21-update-all-button.md) | done (not clicked live) |
 | 2026-10-21 | [Launch busy cursor](2026-10-21-launch-busy-cursor.md) | done (protocol-verified, not clicked live) |
 | 2026-10-21 | [Automatic updates option](2026-10-21-auto-update.md) | done (not run live) |
+| 2026-10-29 | [Install scripts per app](2026-10-29-install-scripts-per-app.md) | done (not clicked live) |

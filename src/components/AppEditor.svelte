@@ -20,6 +20,8 @@
     installed_version: app.installed_version ?? "",
     linux: app.asset_pattern.linux ?? "",
     windows: app.asset_pattern.windows ?? "",
+    script_linux: app.install_script?.linux ?? "",
+    script_windows: app.install_script?.windows ?? "",
   })));
   let preview = $state<Preview | null | undefined>(undefined);
   let previewing = $state(false);
@@ -41,6 +43,7 @@
       installed_version: nul(draft.installed_version),
       skipped_version: draft.skipped_version,
       auto_update: draft.auto_update,
+      install_script: { linux: nul(draft.script_linux), windows: nul(draft.script_windows) },
     };
   }
 
@@ -105,6 +108,11 @@
       <input type="text" bind:value={draft.linux} placeholder="automatic: .deb for this CPU" /></label>
     <label class="field"><span>Windows asset pattern (regex, optional)</span>
       <input type="text" bind:value={draft.windows} placeholder="automatic: .msi for this CPU" /></label>
+
+    <label class="field"><span>Ubuntu install script (https URL, optional, run with sh)</span>
+      <input type="text" bind:value={draft.script_linux} placeholder="https://zed.dev/install.sh or curl -f … | sh" /></label>
+    <label class="field"><span>Windows install script (https URL, optional, run with PowerShell)</span>
+      <input type="text" bind:value={draft.script_windows} placeholder="e.g. https://example.com/install.ps1" /></label>
   </div>
 
   <div class="row" style="margin-top: 12px; gap: 20px">
@@ -129,7 +137,10 @@
     {:else if preview}
       <p class="small">
         Latest release <strong>{preview.tag}</strong>:
-        {#if preview.selected}
+        {#if preview.install_script}
+          runs install script <code>{preview.install_script}</code>
+          <span class="warn">· runs as your user, no checksum</span>
+        {:else if preview.selected}
           <code>{preview.selected}</code>
           <span class={preview.checksum ? "ok" : "warn"}>
             · {preview.checksum ? `checksum from ${preview.checksum}` : "no checksum published"}</span>
@@ -137,7 +148,7 @@
           <span class="danger-text">no matching asset</span>
         {/if}
       </p>
-      {#if preview.installer_assets.length > 1 || !preview.selected}
+      {#if !preview.install_script && (preview.installer_assets.length > 1 || !preview.selected)}
         <p class="muted small">Candidates: {preview.installer_assets.join(", ") || "none"}</p>
       {/if}
     {/if}

@@ -2,8 +2,6 @@ use super::Outcome;
 use crate::{Error, Result};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 /// apt's unprivileged `_apt` user must be able to read the file, and root
@@ -75,45 +73,14 @@ async fn run_apt(
         target.to_string_lossy()
     ));
 
-    let mut child = Command::new(pkexec)
-        .arg("/usr/bin/env")
+    let mut cmd = Command::new(pkexec);
+    cmd.arg("/usr/bin/env")
         .arg("DEBIAN_FRONTEND=noninteractive")
         .arg("/usr/bin/apt-get")
         .args([action, "-y", "-o", "Dpkg::Use-Pty=0", "-o", "APT::Color=0"])
-        .arg(target)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|e| Error::Installer(format!("failed to start pkexec: {e}")))?;
-
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    for reader in [
-        Box::new(stdout) as Box<dyn tokio::io::AsyncRead + Unpin + Send>,
-        Box::new(stderr),
-    ] {
-        let tx = tx.clone();
-        tokio::spawn(async move {
-            let mut lines = BufReader::new(reader).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                let _ = tx.send(line);
-            }
-        });
-    }
-    drop(tx);
-    let mut tail: Vec<String> = Vec::new();
-    while let Some(line) = rx.recv().await {
-        tail.push(line.clone());
-        if tail.len() > 20 {
-            tail.remove(0);
-        }
-        on_line(line);
-    }
-    let status = child.wait().await?;
-    Ok(match status.code() {
+        .arg(target);
+    let (code, tail) = super::run_streaming(cmd, "pkexec", on_line).await?;
+    Ok(match code {
         Some(0) => success,
         // pkexec: 126 = authorization dismissed/denied, 127 = auth failed or no agent.
         Some(126) => Outcome::Cancelled,

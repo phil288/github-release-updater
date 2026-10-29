@@ -28,7 +28,7 @@
   async function install(u: UpdateInfo): Promise<InstallProgress["stage"]> {
     error = null;
     const p = emptyProgress();
-    p.log.push(`Downloading ${u.asset.name}…`);
+    p.log.push(u.asset ? `Downloading ${u.asset.name}…` : `Running install script ${u.install_script}…`);
     store.progress[u.app_id] = p;
     try {
       const report = await api.installUpdate(u.app_id);
@@ -145,7 +145,7 @@
       <button class="link" onclick={() => api.openReleasePage(u.html_url)}>Release page</button>
     </div>
     <p class="muted small">
-      {u.asset.name} · {formatBytes(u.asset.size)}{u.published_at ? ` · published ${new Date(u.published_at).toLocaleDateString()}` : ""}
+      {u.asset ? `${u.asset.name} · ${formatBytes(u.asset.size)}` : `install script ${u.install_script}`}{u.published_at ? ` · published ${new Date(u.published_at).toLocaleDateString()}` : ""}
     </p>
     {#if u.intermediate_tags.length}
       <p class="small muted">

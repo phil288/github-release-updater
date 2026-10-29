@@ -20,6 +20,8 @@ export interface TrackedApp {
   skipped_version: string | null;
   /** Included in automatic installs when `Settings.auto_update` is on. */
   auto_update: boolean;
+  /** HTTPS URL of a script run instead of installing a release asset. */
+  install_script: { linux: string | null; windows: string | null };
 }
 
 export type MsiUi = "passive" | "full";
@@ -80,7 +82,9 @@ export interface UpdateInfo {
   published_at: string | null;
   notes: string | null;
   prerelease: boolean;
-  asset: Asset;
+  /** `null` when installed by `install_script`. */
+  asset: Asset | null;
+  install_script: string | null;
   release_assets: Asset[];
   /** Releases jumped over, newest first. */
   intermediate_tags: string[];
@@ -137,6 +141,7 @@ export interface Preview {
   tag: string;
   selected: string | null;
   installer_assets: string[];
+  install_script: string | null;
   checksum: string | null;
 }
 

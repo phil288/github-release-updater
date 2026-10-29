@@ -29,16 +29,23 @@ pub enum AppsView {
     Cards,
 }
 
-/// Optional per-OS regular expressions overriding automatic asset selection.
+/// Optional per-OS string values (asset patterns, install script URLs).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AssetPatterns {
+pub struct PerOs {
     #[serde(default)]
     pub linux: Option<String>,
     #[serde(default)]
     pub windows: Option<String>,
 }
 
-impl AssetPatterns {
+/// Per-OS regular expressions overriding automatic asset selection.
+pub type AssetPatterns = PerOs;
+
+/// Per-OS HTTPS URLs of an install script (e.g. `https://zed.dev/install.sh`)
+/// run instead of installing a release asset.
+pub type InstallScripts = PerOs;
+
+impl PerOs {
     pub fn for_os(&self, os: crate::assets::Os) -> Option<&str> {
         match os {
             crate::assets::Os::Linux => self.linux.as_deref(),
@@ -79,6 +86,11 @@ pub struct TrackedApp {
     /// Include this app in automatic installs when [`Settings::auto_update`] is on.
     #[serde(default = "yes")]
     pub auto_update: bool,
+    /// When set for the current OS, a new release is installed by downloading
+    /// and running this script (like `curl -f <url> | sh`) instead of a
+    /// release asset.
+    #[serde(default)]
+    pub install_script: InstallScripts,
 }
 
 fn yes() -> bool {
@@ -99,6 +111,7 @@ impl TrackedApp {
             installed_version: None,
             skipped_version: None,
             auto_update: true,
+            install_script: InstallScripts::default(),
         })
     }
 
@@ -119,6 +132,11 @@ impl TrackedApp {
                 })
             })
             .transpose()
+    }
+
+    /// Install script URL for `os`, if this app is installed by script there.
+    pub fn install_script(&self, os: crate::assets::Os) -> Option<&str> {
+        self.install_script.for_os(os)
     }
 }
 
@@ -188,6 +206,16 @@ impl Settings {
             app.repo = repo::parse_repo(&app.repo)?;
             for os in [crate::assets::Os::Linux, crate::assets::Os::Windows] {
                 app.compiled_pattern(os)?;
+            }
+            for field in [
+                &mut app.install_script.linux,
+                &mut app.install_script.windows,
+            ] {
+                *field = field
+                    .as_deref()
+                    .map(crate::script::normalize)
+                    .transpose()?
+                    .flatten();
             }
             if !seen.insert(app.repo.to_ascii_lowercase()) {
                 return Err(Error::InvalidRepo(format!("{} is listed twice", app.repo)));
@@ -289,6 +317,21 @@ mod tests {
         s.apps[0].asset_pattern.linux = None;
         s.apps[0].package_name = Some("bad name;rm".into());
         assert!(s.clone().validate().is_err(), "package");
+        s.apps[0].package_name = None;
+        s.apps[0].install_script.linux = Some("http://zed.dev/install.sh".into());
+        assert!(s.clone().validate().is_err(), "script over http");
+        s.apps[0].install_script.linux = Some(" https://zed.dev/install.sh ".into());
+        let v = s.clone().validate().unwrap();
+        assert_eq!(
+            v.apps[0].install_script.linux.as_deref(),
+            Some("https://zed.dev/install.sh")
+        );
+        s.apps[0].install_script.linux = Some("curl -f https://zed.dev/install.sh | sh".into());
+        let v = s.clone().validate().unwrap();
+        assert_eq!(
+            v.apps[0].install_script.linux.as_deref(),
+            Some("https://zed.dev/install.sh")
+        );
         s.schema_version = 99;
         assert!(s.validate().is_err(), "schema");
     }

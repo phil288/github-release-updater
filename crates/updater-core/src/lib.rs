@@ -13,6 +13,7 @@ pub mod error;
 pub mod github;
 pub mod installer;
 pub mod repo;
+pub mod script;
 pub mod version;
 
 pub use error::{Error, Result};

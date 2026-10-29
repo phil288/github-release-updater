@@ -47,6 +47,10 @@ with the OS's own package tools, after you approve.
   default, per-app opt-out) to start installs right after a check; the OS prompt still appears.
   - Ubuntu: `pkexec apt-get install ./file.deb`, polkit password dialog, live apt output.
   - Windows: `msiexec /i file.msi /passive` started elevated, UAC prompt, MSI progress window.
+- **Install scripts.** For projects that install with a script on their own site
+  (e.g. `curl -f https://zed.dev/install.sh | sh`), set the script's HTTPS URL per app: new
+  GitHub releases are still detected, and the update runs the script as your user (`sh`, or
+  PowerShell on Windows) instead of installing an asset.
 - **Uninstall** tracked apps from the same window (`apt-get remove` / `msiexec /x`).
 - **Backup and restore** settings as JSON, or automatically to **Backblaze B2**. The GitHub token
   and B2 key are stored separately and never written to backups.

@@ -16,6 +16,7 @@ const app = (id: string, repo: string, name: string, installed: string, pkg: str
   installed_version: installed,
   skipped_version: null,
   auto_update: true,
+  install_script: { linux: null, windows: null },
 });
 
 const apps = [
@@ -50,6 +51,7 @@ const update = (a: TrackedApp, tag: string, asset: string, size: number, skipped
   notes: "Bug fixes and performance improvements.",
   prerelease: false,
   asset: { name: asset, browser_download_url: "", size, digest: "sha256:0" },
+  install_script: null,
   release_assets: [],
   intermediate_tags: skipped,
 });
