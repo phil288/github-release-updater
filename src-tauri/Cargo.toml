@@ -32,4 +32,4 @@ uuid = { version = "1", features = ["serde"] }
 # (StatusNotifierItem over D-Bus) reports activation, so clicking the icon can
 # open the window. tray-icon prefers KSNI when both backends are enabled.
 [target.'cfg(target_os = "linux")'.dependencies]
-tray-icon = { version = "0.25", default-features = false, features = ["ksni"] }
+tray-icon = { version = "0.26", default-features = false, features = ["ksni"] }
